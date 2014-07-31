@@ -1,0 +1,85 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=5, fig.height=5, cache=FALSE)
+````
+
+Back to Bayes-ics today. And a return to something a bit closer to home: actuarial math. I had started this, presuming that I would uncover something fascinating about applying Bayesian inference to a low-frequency claims generation process. That isn't at all what I got. What I may have achieved, though, is still something profound. (Profound to me, anyway. As is typically the case, it's probably obvious to most other people.)
+
+I started by doing very basic curve fitting presuming that I'm observing a Poisson process. I assume that the observations were losses excess of some monetary threshold. The overall number of losses is held constant. I'll produce 100 claims per year, every year. However, the average severity will change. For the first ten years, it's one number and then it drops meaningfully beginning with year 11. This will, of course, reduce the excess frequency. The excess point is set so that I expect roughly 5 claims per year. I'll then ensure that the reduced severity is such that the same excess will produce between 2 and 3 claims per year. (I did this through trial and error. It ought to be done with a bit more finesse.)
+
+```{r GenerateClaims, warning = FALSE, fig.width = 15}
+numClaims = 100
+severity = 3500
+# R uses 1 / mean for the exponential parameter. I'm going to call that theta and hope that no one (including me) gets confused by this.
+theta = 1 / severity
+excess = qexp(0.95, theta)
+excess = round(excess, -4)
+
+theoreticalMean = numClaims * (1 - pexp(excess, theta))
+years = 1:10
+excessClaims= numeric(10)
+set.seed(1234)
+for (i in 1:10){
+  claims = rexp(numClaims, theta)
+  excessClaims[i] = sum(claims > excess)
+}
+
+sampleMean = mean(excessClaims)
+print(sampleMean)
+print(theoreticalMean)
+plot(excessClaims, pch = 19, xlab = "Year", ylab = "Excess claims")
+```
+
+In this case, the sample mean is not far off from the theoretical mean. If I could assume that the underlying parameters weren't changing (a very big if!) then I would feel comfortable using the sample mean to predict next year's claims. (Here, I'm assuming that we have no knowledge of the underlying claims. This would be the case if we were writing umbrella over another carrier's primary policy.)
+
+I follow the example in Jim Albert's [Bayesian Computation with R](http://bayes.bgsu.edu/bcwr/), which means that  I'll assume the prior density is a gamma distribution. What does that mean our view of lambda is after two years? After five years? After ten?
+
+```{r LambdaProgression, fig.width = 15}
+x = seq(from = 0, to = 10, length.out = 250)
+
+# We do this in reverse order because the density after ten years will have the largest values.
+yTwo = dgamma(x, shape = sum(excessClaims[1:2]), rate = 2)
+yFive = dgamma(x, shape = sum(excessClaims[1:5]), rate = 5)
+yTen = dgamma(x, shape = sum(excessClaims[1:10]), rate = 10)
+
+plot(x, yTen, type = "l", lwd = 3, xlab = "lambda", ylab = "Pr(lambda)")
+lines(x, yFive, lwd = 2)
+lines(x, yTwo, lwd = 1)
+```
+
+Over time, our confidence in the parameter grows and settles around 5.5 (roughly) which is close to the true mean. After ten years, we're fairly certain that lambda is nowhere near 8, for example. Now what happens when the underlying severity drops and the excess frequency plummets? 
+
+```{r NextFive, fig.width = 15}
+severity2 = 1750
+theta2 = 1 / severity2
+
+years = 10:15
+for (i in 10:15){
+  claims = rexp(numClaims, theta2)
+  excessClaims[i] = sum(claims > excess)
+}
+
+theoreticalMean2 = numClaims * (1 - pexp(excess, theta2))
+sampleMean2 = mean(excessClaims[11:15])
+
+plot(excessClaims, pch = 19, xlab = "Year", ylab = "Excess claims")
+```
+
+For the most recent five years, our sample mean lines up well with the theoretical. But if we're pricing insurance in year 11, we don't know that at all. At that time, all that we can see is zero claims last year and one claim this year. In fact, we see (for this random sample) fewer than five claims per year for years 8 through 11. Four years is an eternity in the commercial insurance marketplace and I guarantee that there would be plenty of folks eager to talk about the improvement in claims results which began in year 8. That the Bayesian approach does not embrace this is a good thing. But it misses the drop in year 11.
+
+How do things look after five years? That depends on how many years we use in our average. If we use all years- which is a good thing if the parameters don't change- then our sample mean is badly out of step with reality. We'll draw a distribution around lambda using all years and also show lambda after ten for comparison.
+
+```{r BayesFive, fig.width = 15}
+yFifteen = dgamma(x, shape = sum(excessClaims[1:15]), rate = 15)
+plot(x, yFifteen, type = "l", lwd = 4, xlab = "lambda", ylab = "Pr(lambda)")
+lines(x, yTen, lwd = 3)
+sample15 = mean(excessClaims[1:15])
+```
+
+There's a clear downward shift in response to the reduced number of claims. But it isn't enough. The full year sample is about 3.3, but next years claims will have a frequency of 0.33. A misestimation of that magnitude is deadly.
+
+So here is where it gets interesting. What I've read in Albert and pretty much everything that I've read in the actuarial literature are focused on measuring the predictive value of a single body of data against some larger whole. The aim is to assess just how much weight one should assign to an element of a set versus the weight assigned to the rest of the set. But there's something 
+
+```{r SessionInfo}
+sessionInfo()
+```

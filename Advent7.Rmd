@@ -1,0 +1,72 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=5, fig.height=5, cache=FALSE)
+````
+
+```{r MapHelpers}
+library(RColorBrewer)
+library(classInt)
+
+MyChoropleth = function(sp, dem, palette, ...){
+  df = sp@data
+  brks = classIntervals(df[, dem], n=length(palette), style="quantile")
+  brks = brks$brks
+
+  sp$MyColor = palette[findInterval(df[, dem], brks, all.inside=TRUE)]
+  plot(sp, col=sp$MyColor, axes=F, ...)
+}
+
+```
+Carrying on from the last post, I'm going to take a closer look at election results for the 2012 US presidential election in North Carolina. This state's 15 electoral votes went to the Republican, Mitt Romney. On the US electoral college map, that means the state shows up as red. As I write this, I'm living in Durham, North Carolina- which is a city just slightly to the left of Leningrad. This part of the state is very blue indeed. How does the rest of the state look? I'll explore this in two steps. The first will color code the map based on the county election results I fetched yesterday. I'll then adjust the color based on the strength of county results. It's all well and good to blue, but who's more blue: Durham or Buncombe county?
+
+First, note that the file I constructed yesterday is effectively "melted". It'll need to be cast so that we have only one row for each county. I'm the world's worst `reshape2` user, but even I can do that in one line of code. (How do I know I'm horrible at reshape2? Because I always assume that `dcast` is in the `plyr` package.)
+```{r MapByCounty, fig.width=10, warning = FALSE}
+dfNC = read.csv("./Data/NorthCarolina2012.csv", stringsAsFactors = FALSE)
+# NOTE THIS BUG FROM YESTERDAY!! MUST FIX THE CODE SO THAT COUNTIES WHOSE NAME ARE TWO WORDS ARE HANDLED PROPERLY
+dfNC$CountyName[dfNC$CountyName == "New"] = "New Hanover"
+head(dfNC)
+
+library(reshape2)
+dfNC = dcast(dfNC, CountyName ~ Party, sum, value.var = "Votes")
+dfNC$Color = ifelse(dfNC$GOP > dfNC$Dem, "red", "blue")
+head(dfNC)
+
+library(UScensus2010)
+library(UScensus2010county)
+data(north_carolina.county10)
+spNC = get("north_carolina.county10")
+
+spNC = merge(spNC, dfNC, by.x = "NAME10", by.y = "CountyName")
+plot(spNC, col = spNC$Color)
+```
+
+And there we are in Durham, as blue as we were expecting. Folks familiar with North Carolina will recognize that most of the large population centers- areas near Raleigh and Charlotte- were also blue. Given that, just how close was the race here?
+
+```{r TotalVotes}
+totalDem = sum(dfNC$Dem)
+totalGOP = sum(dfNC$GOP)
+print(totalGOP - totalDem)
+print((totalGOP - totalDem) / (totalDem + totalGOP))
+```
+
+The GOP won by just over 97,000 votes, or a 2% margin. (I'm ignoring votes cast for 3rd party candidates. It pains me to do so, but we live in a two-party democracy.) Knowing that, how purple is North Carolina and where does it lean more red or blue?
+
+```{r PurpleMap, warning = FALSE, fig.width=10}
+spNC$PctRed = spNC$GOP / (spNC$GOP + spNC$Dem)
+
+write.csv(spNC@data, "./Data/NC2012andCensus.csv", row.names = FALSE)
+myPalette = colorRampPalette(brewer.pal(11,"RdBu"))(101)
+myPalette = rev(myPalette)
+MyChoropleth(spNC, "PctRed", myPalette)
+
+print(spNC$NAME10[spNC$PctRed == min(spNC$PctRed)])
+```
+
+And, yes, I'm living in the most blue county in North Carolina. Take that, all you hippies in Asheville!
+
+Tomorrow, I'll do some predictive modeling of election results by county using US Census data. Do old people skew Republican? Do childless urbanites vote democrats? Tomorrow, we'll know.
+
+```{r SessionInfo}
+citation("UScensus2010county")
+sessionInfo()
+```

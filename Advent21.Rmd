@@ -1,0 +1,58 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=10, fig.height=10, cache=FALSE, echo=TRUE, warning=FALSE, message=FALSE, error=FALSE)
+````
+I drove through Tennessee today. Despite having grown up in Kentucky, I had never really noticed the Tennessee flag, but earlier this year, while in Nashville, I saw it and thought it was one of the cooler state flags. I downloaded a PNG file of the flag from [wikicommons](http://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Tennessee_state_flag.png/800px-Tennessee_state_flag.png) and tried to do what I thought would be a very simple thing. I wanted to draw the state of Tennessee and have the flag appear on top, but clipped along the borders of the state.
+
+Drawing a picture of the flag is fairly easy.
+```{r TN_Flag}
+library(raster)
+library(png)
+pngTN = readPNG("./figure/800px-Tennessee_state_flag.png")
+plot(x = c(0,1000), y = c(0, 1000), type = "n", xaxt ="n", yaxt = "n", xlab = "", ylab = "", bty = "n")
+rasterImage(pngTN, 0, 0, 1000, 1000)
+``` 
+
+As is drawing a picture of the state.
+```{r TN}
+library(maps)
+tn = getData("GADM", country = "USA", level=1)
+tn = tn[match("tennessee", tolower(tn$NAME_1)), ]
+plot(tn)
+```
+
+I can even draw one on top of the other.
+```{r Both}
+tn.bbox = tn@bbox
+xleft = tn.bbox[1,1]
+xright = tn.bbox[1,2]
+ybottom = tn.bbox[2,1]
+ytop = tn.bbox[2,2]
+plot(x = c(xleft, xright), y = c(ybottom, ytop), type = "n", xaxt ="n", yaxt = "n", xlab = "", ylab = "", bty = "n")
+rasterImage(pngTN, xleft, ybottom, xright, ytop)
+plot(tn, add=TRUE)
+```
+
+This next bit required about an hour of work, fussing and research and it still doesn't work right. The assignment of the raster values to the RasterLayer won't accept character data. I converted to factors, which means that the shape of the image is fine, but the colors are off. It's also a **very slow** operation.
+```{r Clipped}
+library(raster)
+library(rgdal)
+mojo = raster(xmn = xleft, xmx = xright, ymn = ybottom, ymx = ytop, nrow = 480, ncol = 800)
+rasterTN = as.raster(pngTN)
+rasterTN = as.factor(rasterTN)
+mojo[] = rasterTN
+masked = mask(mojo, tn)
+plot(masked)
+```
+
+Until tonight, I had thought of a "raster" as something that sounds like a person from Jamaica. It's clear that I need to learn more as this is a hot topic in GIS circles. 
+
+As usual, there's virtually nothing new here. Here are a few links to other dabblings, inspiration and full code examples.:
+Use of `mask` is something that I saw on [gis.stackexchange](http://is-r.tumblr.com/post/33700919594/flag-space-a-scatter-plot-of-raster-images)
+
+I came across [this site](http://www.r-bloggers.com/wp-content/uploads/2010/09/clipping_surface_final.txt) while doing basic interweb research. I didn't spend a great deal of time with that code as it was a bit mysterious.
+
+Last year, [is.R()](http://is-r.tumblr.com/post/33700919594/flag-space-a-scatter-plot-of-raster-images) did a number of posts about flags. This is where I first saw the use of the `rasterImage` function
+
+```{r SessionInfo}
+sessionInfo

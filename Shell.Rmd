@@ -1,0 +1,9 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=10, fig.height=5, cache=FALSE, echo=TRUE, warning=FALSE, message=FALSE, error=FALSE)
+````
+
+#### Session info:
+```{r SessionInfo, echo=FALSE}
+sessionInfo()
+```

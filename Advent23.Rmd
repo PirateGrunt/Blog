@@ -1,0 +1,43 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=10, fig.height=10, cache=FALSE, echo=TRUE, warning=FALSE, message=FALSE, error=FALSE)
+````
+
+Penultimate post, I'm going to take a quick look at the Gini indicator for wealth inequality. Data comes from the [World Bank](http://data.worldbank.org/indicator/SI.POV.GINI).
+
+I've downloaded the zipped file, decompressed it and given it a different name. I'm going to 
+
+```{r ReadCSV}
+dfGini = read.csv("./Data/Gini.csv", stringsAsFactors = FALSE, skip = 2)
+colnames(dfGini) = gsub("X", "", colnames(dfGini))
+library(reshape2)
+mdf = melt(dfGini, id.vars = colnames(dfGini)[1:4])
+mdf = mdf[!is.na(mdf$value), ]
+colnames(mdf)[1:2] = c("Name", "Code")
+library(plyr)
+dfCount = ddply(mdf, "Code", .fun = nrow)
+atLeast5 = dfCount$Code[dfCount$V1 >= 5]
+mdf = mdf[mdf$Code %in% atLeast5, ]
+``` 
+
+This will give us a decent set of data. How does this look when we plot it?
+
+```{r Plot}
+library(ggplot2)
+ggplot(mdf, aes(x = variable, y = value, group = Code)) + geom_line()
+```
+
+Ugh. That looks like nothing. It's a bit late and I'm not all that keen for insight. What countries have had the biggest reduction in income inequality?
+```{r BiggestMovers}
+dfMove = ddply(mdf, "Code", summarize, Diff = max(value) - min(value))
+dfMove = dfMove[order(dfMove$Diff, decreasing = TRUE), ]
+bigMoves = dfMove$Code[1:5]
+
+ggplot(mdf[mdf$Code %in% bigMoves, ], aes(x = variable, y = value, group = Code)) + geom_line()
+```
+
+That's better, but still not very informative. I'm sleepy and going to bed.
+
+```{r SessionInfo}
+sessionInfo
+```

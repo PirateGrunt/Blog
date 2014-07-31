@@ -1,0 +1,23 @@
+This is a test of uploading an image to Wordpress. Based on code written by Yihui Xie.
+
+```{r setup}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=5, fig.height=5, cache=FALSE)
+````
+
+Now we write some code chunks in this markdown file:
+
+```{r}
+## a simple calculator
+1+1
+## boring random numbers
+set.seed(123)
+rnorm(5)
+```
+
+We can also produce plots which are uploaded to imgur.com:
+
+```{r md-cars, message=FALSE}
+library(ggplot2)
+qplot(hp, mpg, data=mtcars) 
+```

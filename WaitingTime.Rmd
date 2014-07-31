@@ -1,0 +1,32 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=10, fig.height=5, cache=FALSE, echo=TRUE, warning=FALSE, message=FALSE, error=FALSE)
+````
+Flip a coin. You don't need to be all that patient to learn which side it will land on. You can flip it a dozen or a hundred times and estimate the probability that it will land on one side or the other.
+
+Wait for something to happen which you *know* will happen. This could be the amount of time until a person dies, the arrival of a bus, or the end of a Grateful Dead performance of "Playin' in the Band". Again, this is something observable and after watching hundreds of people die, waiting for hundreds of busses or listening to several hundred live Dead shows, one will have an understanding about how long each to wait for any of these events.
+
+Now wait for something that you're not sure will happen. This could be a country which might invade another, a marriage proposal (or a divorce), a job promotion or any of a number of other things. These are observable in the same way that the first two phenomena are, but there's a subtle difference. Waiting for something that you know will happen merely requires patience. In this third type of event, the waiting time will continue to color your expectation about the probability that a particular event will occur. If you've been dating for two years and he hasn't popped the question, it could be that he's just not that into you. Or, he's got baggage, commitment issues, or waiting for a job promotion that might not come. Whatever the reason, it's reasonable to assume that the chance the event will occur should also change.
+
+This is another in a long list of things that I'm certain someone has written about and solved, but I'm damned if I can recall having come across it. The other likely explanation is that yes, of course, I read about it but it was just too many beers ago. If there's literature on this topic, I'd love to read it.
+
+Take a very simple example. An event has a 50% chance of occuring. Conditional on its occurrence, it will happen at the end of years 1 through 4 with equal probability. This means the unconditional probability of the event occurring at the end of years 1 through 4 is 12.5%. Assume the event has not occurred by the end of year 1. At one extreme, one holds fast to prior probability of the event and now gives the unconditional times of occurrence as 33% for the end of years 2 through 4. At the other, one assumes that the fact the event did not occur suggests the need to revise the chance that it will occur. The prior unconditional probabilities remain and one now assumes that the event is only 37.5% (12.5% * 3) likely to occur. If the event hasn't occurred after 3 years, there's an 87.5% chance that it won't.
+
+Let's simulate this a few thousand times. We're interested in estimating the probability of occurrence, given that it hasn't occurred at the end of three years. This is really asking for the relative portion of sample results which have a positive event at time t=4. In the code snippet below, I drew inspiration from a [great post on vectorization](http://cartesianfaith.com/2014/01/06/how-to-use-vectorization-to-streamline-simulations/) from the blog Catesian Faith. My code is different, but looking at that post was the first thing I did before writing the function below.
+
+```{r}
+simulate <- function(p, trials, times) {
+  occ = rbinom(1, trials, p)
+  time = sample(1:4, size=occ, replace=TRUE, prob=times)
+  sum(time == 4) / trials
+}
+
+simulate(0.5, 1000, rep(1/4, 4))
+```
+
+OK, that was easy. By construction, we know the probability of the event and conditional time of occurrrence. The simulation just reinforces the point that *when we know what p is* we can easily alter our expectation. The trick is that we don't know what p is. How does this look when p itself is random?
+
+#### Session info:
+```{r SessionInfo, echo=FALSE}
+sessionInfo()
+```

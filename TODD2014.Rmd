@@ -1,0 +1,25 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=5, fig.height=5, cache=FALSE)
+````
+A rare live blog post today. I'm writing this from [Triangle Open Data Day 2014](http://triangleopendataday.com/). This will basically be a page of links that I'll try to get around to later. 
+
+GIS resources:
+* QGIS - an open source GIS app! Download it here: [http://www.qgis.org/](http://www.qgis.org/) I can't wait to play around with this.
+* PostGIS - Geospatial data in an open source RDBMS! [http://postgis.net/](http://postgis.net/) I've done a bit of work in PostgreSQL. A deep dive into OpenStreetMap is on my to-do list. PostGIS is another powerful incentive.
+* GDAL - Utility to translate between geospatial coordinate systems: [http://www.gdal.org/](http://www.gdal.org/)
+* TileMill - Program to change styles for maps. [https://www.mapbox.com/tilemill/](https://www.mapbox.com/tilemill/)
+* Leaflet - Open source java script mapping [http://leafletjs.com/](http://leafletjs.com/)
+
+Open data resources:
+* Raleigh open data. [https://data.raleighnc.gov/](https://data.raleighnc.gov/)
+* Other local data sources: [https://trianglewiki.org/Open_Data_Sources](https://trianglewiki.org/Open_Data_Sources)
+* Socrata - SaaS company acting to make public data available. [http://dev.socrata.com/](http://dev.socrata.com/)
+* RSocrata - An R interface to Socrata. [https://github.com/Chicago/RSocrata](https://github.com/Chicago/RSocrata)
+* Some data sets from Socrata [https://opendata.socrata.com/](https://opendata.socrata.com/)
+
+Cloud development resources:
+* Postman supports testing web services. [http://www.getpostman.com/](http://www.getpostman.com/)
+* Nitrous will set up a virtual machine for Python, Java Script and other development. [https://www.nitrous.io/](https://www.nitrous.io/)
+
+MongoDB presentation is about to start. Will likely update this post.

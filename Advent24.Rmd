@@ -1,0 +1,78 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=10, fig.height=10, cache=FALSE, echo=TRUE, warning=FALSE, message=FALSE, error=FALSE)
+````
+
+OK, so I phoned it in last night. Final post and maybe this one will be a bit better. Can't recall what got me thinking about it, but I was running over the issue of school performance and the erroneous notion that small class sizes will produce better students. This is occasionally debunked, but I thought it'd be fun to demonstrate the appeal of this notion through a random simulation. If memory serves, this is somewhat similar to something that Markus Gesman wrote about on his blog earlier this year.
+
+I'll construct a set of 100 classes, each of which has a random number of students. Each student will have the same probability distribution that describes their performance on an exam. In each case, I'll use a normal distribution, but will round the results so that I get only integral values. I'll also ensure that I only have positive values.
+
+```{r ConstructClasses}
+IntegralNormal = function(n, mean, sd, min, max){
+  val = rnorm(n, mean=mean, sd=sd)
+  val = round(val)
+  val = pmin(val, max)
+  val = pmax(val, min)
+  val
+}
+
+set.seed(1234)
+numClasses = 100
+numStudents = IntegralNormal(numClasses, 20, 3, 10, 30)
+dfClass = data.frame(ClassID = 1:numClasses, NumStudents = numStudents)
+
+CreateStudentResults = function(x, mean, sd, min, max){
+  numStudents = x$NumStudents
+  ClassID = x$ClassID
+  Score = IntegralNormal(numStudents, mean, sd, min, max)
+  df = data.frame(ClassID = rep(ClassID, numStudents), Student = 1:numStudents
+                  , Score = Score)
+  df
+}
+
+library(plyr)
+dfTestResults = ddply(dfClass, .(ClassID), CreateStudentResults, mean=70, sd=10, min=0, max=100)
+``` 
+
+So how did the students do? Looks like they average about a C, with some extraordinary performers at either end.
+
+```{r StudentResults}
+hist(dfTestResults$Score, xlab = "Test score", main = "Histogram of student test scores")
+```
+
+I'm sure that any administrator would like to know which classrooms managed to produce the best overall results.
+
+```{r ClassResults}
+dfClassResults = ddply(dfTestResults, .(ClassID), summarize, AverageScore = mean(Score))
+dfClassResults = merge(dfClassResults, dfClass)
+dfClassResults = dfClassResults[order(dfClassResults$AverageScore, decreasing = TRUE), ]
+sum(dfClassResults$NumStudents[1:25] < 20)
+```
+
+Amazing! 60% of classes in the top quartile had a class size which was below average. Class size is clearly a strong indicator of student performance. But perhaps this was just a fluke. What happens in the following year?
+
+```{r YearTwo}
+dfTestResultsTwo = ddply(dfClass, .(ClassID), CreateStudentResults, mean=70, sd=10, min=0, max=100)
+dfClassResultsTwo = ddply(dfTestResultsTwo, .(ClassID), summarize, AverageScore2=mean(Score))
+dfClassResults = merge(dfClassResults, dfClassResultsTwo)
+dfClassResults = dfClassResults[order(dfClassResults$AverageScore2, decreasing = TRUE), ]
+sum(dfClassResults$NumStudents[1:25] < 20)
+sum(dfClassResults$NumStudents[1:10] < 20)
+```
+
+Similar results in the second year! In fact, 8 out of the top 10 schools have class sizes below average. Well, that proves it.
+
+Anyone who's reading this blog knows that it doesn't prove anything. I've cherry picked the data, I've not observed the results in the same class from the first to the second year, I've not looked at any other variables which may cause these results and I've not constructed and vetted any model to explain the results.
+
+```{r FitModel}
+fit = lm(AverageScore ~ 1 + NumStudents, data = dfClassResults)
+summary(fit)
+```
+
+The number of students is- as we would expect- not a meaningful predictor of test scores. I'll emphasize the obvious point that this is an artificial example and does not demonstrate that smaller class sizes have impact on student performance. This is merely demonstrates that if there were no impact, we could find one. Smaller samples have greater volatility and will appear as outliers on either end of the spectrum.
+
+And that does it. 24 days. 24 posts about R. Later, I'll ruminate on what the exercise meant. For now, thanks to folks who have read and responded. I had a lot of fun doing this and hope that it was- at a minimum- a pleasant diversion.
+
+```{r SessionInfo}
+sessionInfo
+```

@@ -1,0 +1,73 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=5, fig.height=5, cache=FALSE)
+````
+
+I saved the data from the last post which shows the percentage of Republican voters in each county. In addition to that column, I also have figures from the 2010 census. This will show things like age, ethnicity, urbanization and home ownership. Those census figures show actual population counts, so they'll need to be altered to relative numbers to be used in any statistical inference. This will necessitate a read through the obscure column names in the data frame. The USCensus package documents this well.
+
+I'll note two things about the ethnic categories: 1) in pretty much every society on earth, race is a very sensitive, divisive issue with a great deal of history. I'll add the hopelessly needless caveat that although it may be used in a statistical model, that shouldn't suggest that ethnicity connotes any constraints around a person's behavior or ability. 2) Perhaps in conjunction with point 1, the US Census has a very dense set of data collection for race. I'm not going to try to sort through all of the nuance that's captured in the data, but will simply create one data element to capture the percentage of the population which identifies as white, as described in one of the several categories where it is possible to do so.
+
+Everybody cool? Good, let's do some math.
+
+```{r PredictiveVariables, warning = FALSE}
+dfNC = read.csv("./Data/NC2012andCensus.csv", stringsAsFactors = FALSE)
+
+dfNC$PctUrban = dfNC$P0020002 / dfNC$P0020001
+dfNC$PctWhite = dfNC$P0060002 / dfNC$P0060001
+dfNC$PctVacantHousing = dfNC$H0030003 / dfNC$H0030001
+dfNC$PctRent = dfNC$H0110004 / dfNC$H0110001
+dfNC$PctLargeFamily = (dfNC$H0130007 + dfNC$H0130008) / dfNC$H0130001
+dfNC$PctOver65 = (dfNC$H0170009 + dfNC$H0170010 + dfNC$H0170011 + dfNC$H0170019 + dfNC$H0170020 + dfNC$H0170021) / dfNC$H0170001
+dfNC$PctWithChildren = (dfNC$H0190003 + dfNC$H0190006) / dfNC$H0190001
+
+keepCols= c("NAME10", "PctRed", "PctUrban", "PctWhite", "PctVacantHousing", "PctRent", "PctLargeFamily", "PctOver65", "PctWithChildren")
+keepCols %in% colnames(dfNC)
+dfTest = dfNC[, colnames(dfNC) %in% keepCols]
+colnames(dfTest)[1] = "CountyName"
+head(dfTest)
+```
+
+Unfortunately, the urbanization column isn't available for this data. That's a shame as I would imagine that it's very predictive. Later, I'll try to find it elsewhere, or create a proxy variable by computing a population density value.
+
+```{r DropUrban, echo=FALSE}
+dfTest$PctUrban = NULL
+```
+
+
+```{r FitOne, fig.width = 25}
+plot(dfNC$PctWhite, dfNC$PctRed, pch = 19, ylab = "% Red", xlab = "% White")
+plot(dfNC$PctVacantHousing, dfNC$PctRed, pch = 19, ylab = "% Red", xlab = "% Vacant")
+plot(dfNC$PctRent, dfNC$PctRed, pch = 19, ylab = "% Red", xlab = "% Rent")
+plot(dfNC$PctOver65, dfNC$PctRed, pch = 19, ylab = "% Red", xlab = "% Over 65")
+plot(dfNC$PctWithChildren, dfNC$PctRed, pch = 19, ylab = "% Red", xlab = "% w/Children")
+plot(dfNC$PctLargeFamily, dfNC$PctRed, pch = 19, ylab = "% Red", xlab = "% Large family")
+
+fitAll = lm(PctRed ~ PctWhite + PctVacantHousing + PctRent + PctOver65 + PctWithChildren + PctLargeFamily, data = dfNC)
+summary(fitAll)
+```
+
+The plots would suggest that counties with a large population of rentals are less apt to vote Republican. However, both the sign of the relationship and its significance aren't what we'd expect when we include all variables. I'm going to change the column a bit, so that it's percentage of owned homes and drop a few of the insignificant variables and try the fit again.
+
+```{r FitTwo}
+dfNC$PctOwn = 1 - dfNC$PctRent
+
+fitTwo = lm(PctRed ~ PctWhite + PctOver65 + PctWithChildren + PctOwn, data = dfNC)
+summary(fitTwo)
+```
+
+Ownership continues to show up as insignificant, which is just odd. One final fit with only that variable.
+```{r FitOwnership}
+fitOwnership = lm(PctRed ~ PctOwn, data = dfNC)
+summary(fitOwnership)
+```
+
+OK. On its own it's fine, but it gets lost when mixed with the other variables. 
+
+What does all of this mean? It means that- for this set of explanatory variables and construction of data- absent any significant demographic shifts we can probably expect North Carolina to remain red. An influx of non-white residents, or younger residents could alter that. I'll emphasize that this is a very superficial treatment of complex phenomena. In a later post, I'll augment the basic census data with other data elements. Further, I'll try to fetch data for other states to see how the relationships observed here play out elsewhere in the country.
+
+This is also the part where I point out that Nate Silver and Andrew Gelman- two people who are reliably smarter than I am- have written about political forescasting in a way that I can't hope to replicate. I've read their stuff and it's tremensous. You should do the same.
+
+```{r SessionInfo}
+citation("UScensus2010county")
+sessionInfo()
+```

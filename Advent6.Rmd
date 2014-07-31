@@ -1,0 +1,78 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=5, fig.height=5, cache=FALSE)
+````
+I've finally had some success at munging some HTML. For quite some time, I've wanted to render a county level choropleth for US presidential election results. The numbers are all there on [Politico.com](www.politico.com), but attempts to use readHTMLTable never returned the full set of data. It still doesn't, but I have sorted out how to get all of the results I want. It takes a fair bit of work, but- once the smoke clears- doesn't seem too crazy.
+
+First, we'll fetch some raw HTML for North Carolina.
+```{r FetchHTMLfile}
+library(XML)
+
+URL = "http://www.politico.com/2012-election/results/president/north-carolina/"
+content.raw = htmlParse(URL, useInternalNodes = TRUE)
+```
+
+Inspection of the tables which get returned tell us that the second element in the list has the data we need. Attempts to extract the information lead us to take a slightly different approach. First, we'll get all the nodes with a "tbody" element. Each of these nodes may be treated as a table.
+
+```{r GetCountyTables}
+tables <- getNodeSet(content.raw, "//table") 
+counties = getNodeSet(tables[[2]], "//tbody")
+counties = counties[-1]
+
+countyTables = lapply(counties, readHTMLTable, header = FALSE, stringsAsFactors = FALSE)
+```
+
+The table we get isn't quite what we want.
+```{r ShowWrongTable}
+head(countyTables[[1]])
+```
+
+A couple helper functions will fetch the county name and move the cells to a sensible location.
+```{r HelperFunctions}
+GetCountyName = function(dfCounty){
+  strCounty = dfCounty[1,1]
+  strCounty = strsplit(strCounty, " ")
+  strCounty[[1]][1]
+}
+
+MungeTable = function(dfCounty){
+  
+  if (ncol(dfCounty) != 5 ) return (data.frame())
+  
+  dfCounty[1, 1]= GetCountyName(dfCounty)
+
+  dfCounty[-1, 2:5] = dfCounty[-1, 1:4]
+  
+  dfCounty[, 1] = dfCounty[1, 1]
+  
+  colnames(dfCounty) = c('CountyName', 'Candidate', 'Party', 'Pct', 'Votes')
+  
+  dfCounty$Votes = gsub(",", "", dfCounty$Votes)
+  dfCounty$Votes = as.numeric(dfCounty$Votes)
+  
+  dfCounty$Pct = NULL
+  
+  dfCounty
+}
+
+correctTable = MungeTable(countyTables[[1]])
+head(correctTable)
+```
+
+With that done, it's a simple thing to munge each data frame and then bind the results into a single data frame. 
+```{r MungeCounties}
+counties = lapply(countyTables, MungeTable)
+dfNorthCarolina = do.call("rbind", counties)
+
+```
+
+A plot shows that Obama won in counties with a high population, but didn't do as well in smaller counties. I'll draw some better charts tomorrow.
+```{r PlotResults, , fig.width = 10}
+library(ggplot2)
+ggplot(dfNorthCarolina, aes(x = CountyName, y = Votes, fill = Party)) + geom_bar(stat = "identity")
+```
+
+This required getting very, very familiar with the underlying HTML structure. That's a hassle, but hardly impossible. Tomorrow, this will become a map and I'll make some inferences about voting patterns and demographics.
+```{r SessionInfo}
+sessionInfo()
+```

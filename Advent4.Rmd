@@ -1,0 +1,42 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=5, fig.height=5, cache=FALSE)
+````
+So my first attempt to sort out the career of Michael Caine via parsing of HTML data was a wash. I'm going to try this again, using Wikipedia. They've got a nice, easy list of his films in an HTML table. Reading an HTML table into R is incredibly easy. The `XML` library has a function to sort that out.
+```{r FetchHTMLfile}
+library(XML)
+
+URL = "http://en.wikipedia.org/wiki/Michael_Caine_filmography"
+dfCaine = readHTMLTable(URL, stringsAsFactors = FALSE)
+dfCaine = dfCaine[[1]]
+```
+
+Man, that was easy. If I can catch a few more hours, I'll spend more time with imdb's file. Until then, though, this is just so much less hassle. So, once again, let's try to learn about Michael Caine.
+```{r plotYears}
+library(ggplot2)
+plt = ggplot(dfCaine, aes(Year)) + geom_bar()
+plt
+```
+
+And we get a much different picture than what we saw with my poor attempt to munge the imdb data. With this, there doesn't appear to have been a late career resurgence, at least as far as the number of films. Let's have a quick look at prestige, though. We'll not bother to distinguish between a nomination and receipt of an award. For now, we'll just zero in on the word "award".
+```{r awards}
+award = grep("award", tolower(dfCaine$Notes))
+dfCaine$award = FALSE
+dfCaine$award[award] = TRUE
+qplot(Year, data = dfCaine, geom="bar", fill = award)
+```
+So, it doesn't appear as though critics have taken special note of him in his later years. I would have hypothesized that actors are often judged against a body of work, which would mean that there is a greater likelihood that they will be recognized as they get older. That doesn't appear to be the case here.
+
+Finally, let's compress this into decades. The display of years works fine here in RStudio, but looks fairly dreadful on the web. Sir Michael has been around long enough that we can bin his career into ten year intervals with little loss of information.
+```{r decades, warning = FALSE, message = FALSE}
+dfCaine$Year = as.numeric(dfCaine$Year)
+dfCaine$Decade = trunc((dfCaine$Year - 1900) / 10) * 10
+qplot(Decade, data = dfCaine, geom="bar", fill = award)
+```
+
+When the data are aggregated in this way, the 80's look like a bit of a high point (Educating Rita and Hannah and Her Sisters), with a more abrupt drop off in the 90's. The 2010's are just getting started. Let's hope it's a good decade for Michael Caine.
+
+BTW, Kansas City has a society of film critics. I've never been to Kansas City and don't want to cast any aspersions, but it's hardly a hotbed of cultural activity. Do they really need a *society* of critics?
+```{r SessionInfo}
+sessionInfo()
+```

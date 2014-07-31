@@ -1,0 +1,13 @@
+I'm the first (I hope) to admit when I've gotten something wrong. I like to think I'm humble enough to realize that there are limits to my knowledge. Actually, humility doesn't enter into it. Every day I'm confronted with things that I don't know or understand. Those same limits can often blind me to being sage enough to recognize when I've gone off the rails. With time, however, knowledge begins to seep in. So, here it is, stuff I've gotten wrong:
+
+1. [Using a list to store complicated data types in S4 objects is absurd and unnecessary](http://pirategrunt.com/2013/07/22/vectors-of-s4-classes-with-non-trivial-slots/). 
+There's a lenghty explanation here, but suffice it to say that it's absolutely possible to vectorize individual elements of your S4 object. I've done it and it's a gas. Don't get me wrong, it's not a walk in the park, but it allows you to build up very complicated objects. So long as accessor functions are coded cleanly, things will work out. Using a list to store complicated elements is a bad idea on a number of levels.
+
+2. [It's totally possible to extract the contents of a data frame without fear of R returning a vector](http://pirategrunt.com/2013/06/12/more-fun-with-data-frames/).
+This is really embarassing. All you need to do is set the parameter drop=TRUE.
+
+3. [Computed columns might be a good idea](http://pirategrunt.com/2013/05/08/computed-columns-for-dataframes/). My thoughts on how to implement them and my response to alternate suggestions was moronic. I use reshape2 and plyr all the time. I'm still not happy that I can't simply define a computed column like I can in SQL, but I've not developed a better alternative. 
+
+I'm sure there are others. My initial epiphany about mapply and its relation to nested loops has faded. This is mostly the result of my having gained deeper experience with the vectorization of the language. I still use mapply in this way, so I'm not yet ready to concede that this is approach is "wrong", per se.
+
+A few weeks ago, I was in Africa as part of a team of instructors demonstrating how to use R. I sat with one of the students for two hours going over some basic coding. At one point, I could tell that he was reluctant to execute a command after he'd typed it. I told him, "Learning R means making many, many mistakes. Go ahead and get started and don't worry." His code ran fine.

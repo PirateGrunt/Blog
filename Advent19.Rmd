@@ -1,0 +1,68 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=10, fig.height=10, cache=FALSE, echo=TRUE, warning=FALSE, message=FALSE, error=FALSE)
+````
+Carrying on with the multi-level model, I'm going to look at the paid and incurred workers comp losses for a large number of insurance companies. This is a similar exercise to what I did last night, but I'm now working with real, rather than simulated data and the stochastic process is assumed to be different.
+
+First, I'll fetch some data from the CAS. I'm only going to look at paid and incurred losses in the first development period. I'd love to chat about the relative merits of multiplicative vs. additive chain ladder, but some other time. Tonight, I'll use data that's effectively meaningless in a chain ladder context.
+```{r GetNAICData}
+URL = "http://www.casact.org/research/reserve_data/wkcomp_pos.csv"
+
+df = read.csv(URL, stringsAsFactors = FALSE)
+df = df[, c(2:7, 11)]
+colnames(df) = c("GroupName"
+                 , "LossPeriod"
+                 , "DevelopmentYear"
+                 , "DevelopmentLag"
+                 , "CumulativeIncurred"
+                 , "CumulativePaid"
+                 , "NetEP")
+df = df[df$DevelopmentLag == 1, ]
+
+plot(CumulativeIncurred ~ NetEP, data=df, pch=19, ylab = "Loss", xlab = "Net earned premium")
+points(df$NetEP, df$CumulativePaid, pch=19, col = "red")
+```
+The first couple things I notice is that both sets have some inherent volatility and when plotting against earned premium, we'll probably see some heteroskedasticity in the fit. However, a linear fit looks to be a fairly safe call for the lower premium observations. There are also some erroneous values- premium shouldn't be negative. I'll eliminate the bogus premium observations and also look the losses on a log scale so that the points on the left are easier to observe.
+```{r Munge}
+df = df[df$NetEP> 0, ]
+
+plot(log(CumulativeIncurred) ~ NetEP, data=df, pch=19, ylab = "Loss", xlab = "Net earned premium")
+points(df$NetEP, log(df$CumulativePaid), pch=19, col = "red")
+```
+The log doesn't help loads. Really, all that it does is suggest that there are two pretty good fit lines. As with the data from yesterday, I'll perform one fit using the grouped data and another where each company is fit individually.
+```{r PoolAndSplit}
+fitPool = lm(CumulativePaid ~ 1 + NetEP, data=df)
+summary(fitPool)
+df$PoolPaid = predict(fitPool)
+plot(CumulativePaid ~ NetEP, data = df, pch = 19)
+lines(df$NetEP, df$PoolPaid)
+
+fitSplit = lm(CumulativePaid ~ 1 + NetEP:GroupName, data = df)
+plot(coef(fitSplit)[abs(coef(fitSplit)) < 50], pch = 19, ylab="Slope")
+df$SplitPaid = predict(fitSplit)
+plot(CumulativePaid ~ NetEP, data = df, pch = 19)
+points(df$NetEP, df$SplitPaid, col = "red", pch=19)
+```
+Lots of negative slopes and a great deal of variation when we fit each company separately. How does a blended model look?
+```{r StateSims}
+library(lme4)
+fitBlended = lmer(CumulativePaid ~ NetEP + (0 + NetEP|GroupName), data = df)
+df$BlendedPaid = predict(fitBlended)
+
+plot(CumulativePaid ~ NetEP, data = df, pch = 19)
+points(df$NetEP, df$BlendedPaid, col = "red", pch=19)
+```
+One way to measure the performance of the model is to compute the root mean squared error of prediction
+```{r rmse}
+rmsePool = sqrt(sum((df$PoolPaid - df$CumulativePaid)^2))
+rmseSplit = sqrt(sum((df$Split - df$CumulativePaid)^2))
+rmseBlended = sqrt(sum((df$BlendedPaid - df$CumulativePaid)^2))
+```
+In this case, the split model- noise and all- works best. Usual caveats apply: this works for this data set only, there ought to be cross validation, measurement against out of sample data, etc.
+
+By the way, a really fantastic introduction to mixed effects regression may be found at [AnythingButRBitrary](http://anythingbutrbitrary.blogspot.com/2012/06/random-regression-coefficients-using.html).
+
+Tomorrow: Meh. 
+
+```{r SessionInfo}
+sessionInfo()

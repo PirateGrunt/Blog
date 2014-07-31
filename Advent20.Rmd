@@ -1,0 +1,51 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=10, fig.height=10, cache=FALSE, echo=TRUE, warning=FALSE, message=FALSE, error=FALSE)
+````
+Some time ago, I was doing some analysis and trying to determine whether or not there was a predictive variable for a binomial response. I ran logistic regressions for about half a dozen variables in different combinations and nothing showed a fit of any significance. Well, almost nothing. I had measured the response against date. Date is a continuous variable, so a regression will generate only one coefficient. However, I also tried month as a categorical variable- twelve coefficients. There are reasons for assuming that a particular month may have explanatory power. Businesses have fiscal years and certain dates attract different behavior. Reinsurance contracts often have a renewal date of the first of January, July and April. In these cases, the month, per se, explains nothing. It's merely a proxy for some other effect. Does increased volume alter the way business is handled? Are larger insurers more likely to stick to a July 1 renewal date?
+
+In this particular case, one month showed up as being (barely) significant. There was no "real" explanatory variable that I could think of. This doesn't mean that one doesn't exist. ([Absence of evidence is not evidence of absence.](http://en.wikiquote.org/wiki/Carl_Sagan)) But there was another explanation that I wanted to explore. Using the standard 5% threshold, what is the likelihood that a single month may appear to be significant, even when it is not?
+
+I'm certain there's a much better way to demonstrate this analytically, but I'm going to cheat and use simulation. I'm going to assume a fairly high level for the probability of success (which was the case in the data I was looking at) and then randomly generate a few thousand sample sets and run a few thousand regressions. How often do I get a spurious result?
+```{r FirstSample}
+numObservations = 400
+p = 0.9
+trials = 1000
+month = 1:12
+
+SampleSet = function(numObservations, p){
+  Result = ifelse(runif(numObservations) <= p, 1, 0)
+  Month = sample(1:12, size = numObservations, replace = TRUE)
+  df = data.frame(Result = Result, Month = Month)
+  df
+}
+
+set.seed(1234)
+df = SampleSet(numObservations, p)
+
+plot(jitter(df$Month), jitter(df$Result), pch = 19, xlab = "Month", ylab = "Result")
+fit1 = glm(Result ~ as.factor(Month), data = df, family=binomial(link="logit"))
+``` 
+
+And, with the first random trial, month 3 is _almost_ significant. Let's repeat that 1000 times.
+
+```{r Samples}
+significant = integer()
+for (i in 1:trials){
+  df = SampleSet(numObservations, p)
+  fit = glm(Result ~ as.factor(Month), data = df, family=binomial(link="logit"))
+  # This will pull the rightmost column of the coefficient matrix
+  coefs = summary(fit)$coefficients[, 4]
+  # Get rid of the intercept
+  coefs = coefs[-1]
+  # Count if any cases are less than 0.05
+  significant[i] = sum(coefs < .05) > 0
+}
+```
+
+And how many times out of 1,000 do we find a month that's significant? In `r sum(significant)` cases, one of the months is deemed significant. That's more than the 5% chance for any individual factor, but not as large as I would expect. (Again, I know there's a way to work this analytically, but I'm much slower with pen, paper and math. I'll get to it at some point.) 
+
+There's probably also something Bayesian to be said, but right now I need to pack a suitcase. Tomorrrow I'm driving home to the beautiful state of Kentucky to visit my wonderful grandmothers and assorted relations. With luck, I'll get to post something before bedtime.
+
+```{r SessionInfo}
+sessionInfo
