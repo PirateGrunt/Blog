@@ -1,0 +1,75 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=5, fig.height=5, cache=FALSE)
+````
+
+I couldn't manage to find time yesterday, so today I'm going to try and catch up with two posts. In the first, I'm going to talk about a package I've been gradually working on over the course of the year. After all, what's Christmas if you don't get a package?
+
+I do quite a lot of lightweight ETL (extract, transform, load) and I've gotten in the habit of doing it in R. There are a few reasons for this: 1) I wasn't aware of Knime when I started 2) Knime doesn't play nice with my SQL Server instance (some sort of JDBC issue) 3) R gives me the chance to use knitr so that the ETL is (or can be) well documented and 4) because I can run R from the command line, I can use Windows Task Scheduler to have the ETL run at routine times.
+
+That's all pretty cool stuff. To support this, I have a set of code which began as scripts, migrated to functions, evolved into a personal package and is now ready to go public. It doesn't do much. It's mostly a way to leverage RODBC to query my database's metadata and fail gracefully when the data I want to load can't be loaded. 
+
+In the next stage of development it will support some basic examination of a load and report on the affected records, identify inconsistencies, store questionable records for further processing and so forth.
+
+How does it work? 
+
+1. Create a table to store metadata relating to the target tables and their sources. More on this in a moment.
+2. Fetch the metadata for the target table. This will include column names and data types in the target DB and in the source data frame.
+3. Fetch a dataframe. If you're using a csv file, the metadata will give you proper column names.
+4. Check the source data frame columns against the target. Report to the user if there's a misalignment.
+5. Decide whether to clear the target table before load.
+6. Load
+
+I've included hooks for running server side procedures before and/or after import. I do this so that I can remove computed columns before import and then restore them afterwards. RODBC and/or my SQL server don't like it when I try to append to a table which has computed columns. I've tried a few things here, but this solution works well. Other suggestions are welcome.
+
+About the metadata
+This process relies heavily on keeping track of metadata in the target DB and aligning it with source information. It's of very little use if the source information changes frequently, or can't be easily guessed.
+The metadata is two tables. The first has a list of target tables and associated source files. As currently written, there's a one-to-one correspondence between the target table and the source data. I'd like to get to a place where this can be a bit more flexible.
+
+A couple caveats:
+1. This package- and R- are lousy ideas for ETL of any significant size. If you're a heavy load DBA, you needn't tell me that there are better solutions. I know. However, in my career, I've seen so many toy databases get created that something lightweight like this is a big help.
+2. This won't go on CRAN for a while, if ever. I'd need more complete and robust functionality. However, if you're interested, it's all on [GitHub](https://github.com/PirateGrunt/ImportR).
+
+A basic import script looks like the following:
+```{r ImportScript, echo = TRUE, eval=FALSE}
+library(ImportR)
+
+channel = odbcConnect(dsn = "MyDSN", uid = "Me", pwd = "Guess")
+
+ImportTable(channel, "tblTarget", header = FALSE, ClearTableFirst = TRUE)
+```
+
+This relies on the ImportTable function, which queries the database for the file to load, fetches the metadata and loads the CSV into my database. Note the hooks for pre and post import setup and cleanup on the server.
+
+```{r ImportTable, echo=TRUE, eval=FALSE}
+ImportTable = function(channel, DestinationTable, header, ClearTableFirst)
+{
+  fileSource = GetSourceFilename(channel, DestinationTable)
+  if (length(fileSource) == 0) {
+    warning(paste0("No filesource was found for ", DestinationTable))
+    return (NA)
+  }
+  
+  importMap = GetMapName(channel, DestinationTable)
+  if (length(importMap) == 0) {
+    warning(paste0("No import map was found for ", DestinationTable))
+    return (NA)
+  }
+  
+  dfCSV = ReadCSV(channel, DestinationTable, fileSource, header)
+  if(nrow(dfCSV) == 0){
+    warning(paste0("No records returned for ", fileSource))
+    return (NA)
+  }
+  
+  RunProc (channel, DestinationTable, TRUE)
+  
+  SaveDF(channel, dfCSV, DestinationTable, ClearTableFirst)
+  
+  RunProc (channel, DestinationTable, FALSE)
+}
+```
+
+```{r SessionInfo}
+sessionInfo()
+```

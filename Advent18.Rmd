@@ -1,0 +1,74 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=10, fig.height=10, cache=FALSE, echo=TRUE, warning=FALSE, message=FALSE, error=FALSE)
+````
+
+Earlier today, while looking for something else, I managed to stumble across a presentation given at the 2010 CAS RPM. (Egregious self-promotion: I'll be leading a day-long workshop at [next year's RPM in Washington, DC](http://www.casact.org/rpm/index.cfm?fa=workshop).) I wasn't looking for a presentation on hierarchical models, but there one was. The fantastic Jim Guszcza has a [great slide show on hierarchical models](http://www.casact.org/education/rpm/2010/handouts/PM11-Guszcza.pdf) in an actuarial context. Actually, it's so great that you should stop reading this post now, go read Jim's presentation and prepare to spend the next few hours reading [everything that Jim has written](http://www.casact.org/research/dare/index.cfm?fa=adv_search_rs&keyword=&title=&abstract2=&authorFirstName=&authorLastName=Guszcza&publication=&prizeID=&isCASSyll=&hasAudio=&hasRelated=&category=&search=Search)
+
+Anyone still reading this? OK, so a few days ago, I simulated some Poisson claims. This is the first step of what will one day be a multi-level simulation. I'm doing this solely to get better at understanding how to fit multi-level/hierachical models. I tend to learn random process best by simulating them first. I'll confess that I was a bit disappointed by that first post. I think that stems largely from the fact that I had very few observations and that the "between" variance was so much larger than the "within" variance. That is to say that I had begun by presuming a "root" Poisson process for the entire United States and that each of the 51 states has its own Poisson. This is likely too simple a model. I'm going to forego additional layers of the model and- for now- augment the state level process by simulating a lot more claims. Each state will have 10,000 policies, each of which will have its own set of claims. If I can stay awake long enough, I'll try to add some state-level overdispersion and see what it does to the simulations and the fit. (Aside: I'm shifting from 51 to 50 states so that I can lazily add an abbreviation)
+
+```{r NationalParams, echo=FALSE}
+fff = function(pars) {
+    shape = pars[1]
+    scale = pars[2]
+    y = abs(25 - qgamma(0.9, shape = shape, scale = scale))
+    z = abs(10 - shape * scale)
+    y + z
+}
+ 
+pars = optim(par = list(shape = 10, scale = 2), fff)
+scale = pars$par["scale"]
+shape = pars$par["shape"]
+numStates = 50
+set.seed(1234)
+lambdas = rgamma(numStates, shape = shape, scale = scale)
+```
+
+The first code chunk will be a repeat from Sunday's post. I'll execute it, but not display the code. At this stage, I have 51 lambdas that have been simulated from a gamma distribution with a scale of `r scale` and a shape parameter of `r shape`. (Again, this code has been evaluated, but not echoed. That same code is may be seen [here](http://pirategrunt.com/2013/12/15/24-days-of-r-day-15/).)
+
+```{r StateSims}
+library(datasets)
+numPolicies = 10000
+dfPolicies = as.data.frame(expand.grid(1:numStates, 1:numPolicies))
+colnames(dfPolicies) = c("State", "PolicyID")
+dfPolicies$Lambda = lambdas[dfPolicies$State]
+dfPolicies$NumClaims = rpois(nrow(dfPolicies), dfPolicies$Lambda)
+dfPolicies$Postal = state.abb[dfPolicies$State]
+
+hist(dfPolicies$NumClaims[dfPolicies$State == 1], xlab = "NumClaims", ylab = "Density", main=state.abb[1])
+hist(dfPolicies$NumClaims[dfPolicies$State == 2], xlab = "NumClaims", ylab = "Density", main=state.abb[2])
+```
+
+That's enough variation to keep me happy. So, what does the fit look like? I'll first fit a single model and then individual models.
+
+```{r Fits}
+fitPool = glm(NumClaims ~ 1, family = poisson, data = dfPolicies)
+summary(fitPool)
+mean(dfPolicies$NumClaims)
+exp(coefficients(fitPool))
+
+fitState = glm(NumClaims ~ 0 + Postal, family = poisson, data = dfPolicies)
+
+mean(dfPolicies$NumClaims[dfPolicies$Postal == "AK"])
+exp(coefficients(fitState)[1])
+```
+
+Note that in this very simple example, the pooled fit gives a lambda parameter equal to the sample mean. By the same token, the model which has a different parameter for every state produces a parameter equal to the sample mean for that state. (Careful with the indexing. Using the postal code as a variable means that it will be re-sorted.)
+
+To fit a model which is a blend between the individual and pooled data, I'll need to the `lme4` package. 
+
+```{r Blended}
+library(lme4)
+fitBlended = glmer(NumClaims ~ 1 + (1 | Postal), family = "poisson", data = dfPolicies)
+AK = coefficients(fitBlended)
+AK = AK$Postal
+AK = AK[[1]][1]
+exp(AK)
+mean(dfPolicies$NumClaims[dfPolicies$Postal == "AK"])
+```
+
+Note that now the estimated number of claims does NOT equal the sample mean. I'll admit that I've lost track of the overall intercept parameter, but I may recall how to fetch that by the morning. I'll also note that the AIC is actually higher using this blended model, so the model is not any better than fitting states individually. (Put differently, each state has 100% credibility.) This is likely because the "between" variance is much, much higher than the "within" variance. I'll try to play with that a bit later.
+
+Tomorrow: It's possible that I've got nothing left to say. Anyone who can provide me with a data set which has film roles and co-stars for Michael Caine and Kevin Bacon will get a free case of beer.
+```{r SessionInfo}
+sessionInfo()

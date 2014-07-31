@@ -1,0 +1,69 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=5, fig.height=5, cache=FALSE)
+````
+
+In this post, I'll look at a very quick way to look at the relationships in a database. I had a bit of fun with my first network graph and plotting the connections between tables and views seems like a natural extension. Here, I'm  going to create a bare bones insurance database. We have a defined business segment, which contains one or more accounts. Each account purchases one or more policies and each policy has one or more claims. Finally, each claim is evaluated over the course of its existence and paid and outstanding losses are recorded. Very basic. I'm not going to describe the schema here (though you can see it on my GitHub at the [RxR project](https://github.com/PirateGrunt/RxR)). The point is to explore the structure of a database without knowing anything at all about it.
+
+I'm using (free, but closed source) SQL Server Compact as I'm having difficulty getting the PostgreSQL ODBC driver to play nicely with RODBC. I've just started diagnosing this- it's almost certainly a 32 vs. 64 bit issue- but if anyone has suggestions, I'm all ears. I'm trying to make Postgres my default database, but it has to work with R. That's a longwinded way of explaining the line where I remove the sysdiagrams table from my output.
+
+RODBC has a number of functions to report metadata. I've used sqlColumns as an aid for more robust ETL, but haven't played with some of the others. Let's see what they can do.
+
+```{r FetchMeta, echo=TRUE}
+library(RODBC)
+myChannel = odbcConnect(dsn = "RxR")
+
+dfTables = sqlTables(myChannel, schema = "dbo")
+dfTables = dfTables[dfTables$TABLE_NAME != "sysdiagrams", ]
+tableNames = dfTables$TABLE_NAME[dfTables$TABLE_TYPE == "TABLE"]
+queryNames = dfTables$TABLE_NAME[dfTables$TABLE_TYPE == "VIEW"]
+
+dfColumns = lapply(c(tableNames, queryNames), sqlColumns, channel = myChannel)
+dfColumns = do.call("rbind", dfColumns)
+
+dfKeys = lapply(tableNames, sqlPrimaryKeys, channel = myChannel)
+dfKeys = do.call("rbind", dfKeys)
+```
+
+As an amateur programmer, all of my code is evolutionary. It starts specific and moves to something more general. I've taken yesterday's function to create a relationship table and generalized it for the case of database columns. In the two examples I've worked with, I'm examining groups which have members who may participate in other groups. This could be a musician with a side project, or it could be a column whose value is used as a foreign key or the result of a query.
+
+```{r Relate, echo = TRUE}
+CreateRelation = function(dfTable, IntraColumn, GroupName){
+  
+  myVector = dfTable[, IntraColumn]
+
+  indices = combn(length(myVector), 2)
+  
+  dfRelate = data.frame(from = myVector[indices[1, ]]
+                        , to = myVector[indices[2, ]])
+                  
+  dfRelate$GroupName = dfTable[, GroupName][1]
+  
+  dfRelate
+  
+}
+
+lstColumns = split(dfColumns, dfColumns$TABLE_NAME)
+dfRelations = lapply(lstColumns, CreateRelation, "COLUMN_NAME", "TABLE_NAME")
+dfRelations = do.call("rbind", dfRelations)
+```
+
+With that done, we can display a network graph of all of the columns and queries in the database.
+
+```{r graph, echo = TRUE, fig.width = 12, fig.height=12}
+library(igraph)
+
+#g = graph.data.frame(dfRelations, directed=FALSE, vertices=dfColumns[, c("COLUMN_NAME","TABLE_NAME")])
+g = graph.data.frame(dfRelations, directed=FALSE)
+
+set.seed(1234)
+plot(g, vertex.color = g$Color)
+```
+
+I love this. Somehow the account name, but not the account ID is related to claim count. Has the query been properly designed? Policy information sits by itself, walled off from the marketing segment and the claims information, as it should be. There are just two steps from paid loss to business segment. This also makes a bit of sense.
+
+There are several dozen things that I'd like to do with this, but they'll have to wait until tomorrow or later. I'm going to keep playing with this as I think it's a fantastic way to get an initial read on the complexity of a new database. There are several things in this world that I absolutely love. One of them is a map. Another? Metadata!
+
+```{r SessionInfo}
+sessionInfo()
+```

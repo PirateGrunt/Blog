@@ -1,0 +1,10 @@
+*.html
+*.RData
+*.RDataTmp
+*.Rhistory
+*.gz
+*.csv
+*.zip
+*.txt
+figure/
+cache/

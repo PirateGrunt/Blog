@@ -1,0 +1,41 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=5, fig.height=5, cache=FALSE)
+````
+
+Over the course of the next few days, I'm going to try to find enough time to build up a reasonably simple simulation of insurance exposure and claims. I'll be taking a hierarchical view of the underlying process. As with pretty much everything that I write about, I'm writing about it as I'm learning about it. It was only last year that I first started getting familiar with the Andrew Gelman and Jennifer Hill text, which is a fantastic book. Over the time that I've had the book, I've peruse it, but have not yet really gotten my hands dirty with it in practice.
+
+I'm going to look at a claim count generation process where the number of claims is Poisson distributed. The Poisson parameter will be keyed to exposure at a later stage, but for now, we'll assume a constant level of exposure. I'll presume that I'm looking at the business of a national insurance carrier, based in the United States, which experiences claims in all of the 50 states and DC. As a first step, I'll assume a two level hierarchy. There is a “national” distribution of lambda parameters and each state has its own distribution, which is based on a random draw from the national distribution.
+
+Again drawing inspiration from Jim Albert's book Bayesian Computation with R, I'll assume that the national parameter is taken as a random draw from a gamma. An expected value of ten claims per year seems interesting enough. As for the variance, I'd like a 10% chance that lambda is greater than 25. This time, I'll not be lazy and will use the optim function to determine that scale parameter which will give me this distribution. I'm using a slightly ham-fisted objective function wherein I combine two constraints.
+
+```{r ReadFile, echo=TRUE}
+fff = function(pars) {
+    shape = pars[1]
+    scale = pars[2]
+    y = abs(25 - qgamma(0.9, shape = shape, scale = scale))
+    z = abs(10 - shape * scale)
+    y + z
+}
+ 
+pars = optim(par = list(shape = 10, scale = 2), fff)
+1
+## Warning: NaNs produced
+1
+2
+3
+4
+5
+6
+scale = pars$par["scale"]
+shape = pars$par["shape"]
+ 
+x = seq(from = 0, to = 50, length.out = 250)
+y = dgamma(x, shape, scale = scale)
+plot(x, y, pch = 19)```
+
+The first thing that leaps out at me is the fact that the US' participation is rather low. 
+``
+```{r SessionInfo}
+sessionInfo()
+```

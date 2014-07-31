@@ -1,0 +1,138 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=5, fig.height=5, cache=FALSE)
+````
+
+I've had a statistical question that I've wanted to answer for more than 20 years. In college, I often played the strategy game "Axis & Allies" with friends. (Hi Brad, Rob, Brady and Marty!) The game is a crude simulation of the second world war, with various military units available to the player. The player chooses which units to utilize based on their available resources and the particular strengths and weaknesses of the units. A key feature is that units have different capabilities with respect to attack and defense. The most ubiquitous units are infantry and tank divisions. Infantry units attack with a 1/6 probability of success, but defend with a 1/3 probability. Tanks attack with a 1/2 probability of success, but defend with a 1/3. The tank is obviously a more powerful unit and so it costs more. Infantry units cost 3 resource points and tanks cost 5. So, for the same 30 resource points, which unit is more valuable? This obviously depends on other characteristics of the game such as the players' current positions and tactical objectives. I typically played Russia and the starting position of the game meant that I typically invested almost exclusively in infantry units. This tended to work as the German player would attack and I would defend. However, I never went about trying to demonstrate this mathematically. 
+
+It's possible- and quite likely- to have more than one type of unit available in a player's army. However, I'm going to ignore this for now and assume that a force composed of one type of unit is attacking a force of another type of unit. We'll code a simple function to resolve a battle and then show the results of one example. One of the really cool things about the list construct is that a function can return an arbitrarily complex set of information with no effort.
+
+```{r BattleFunction, echo=TRUE}
+Battle = function(numAttack, numDefend, probAttack, probDefend){
+  
+  while (numAttack > 0 & numDefend > 0){
+    casualtiesAttack = rbinom(1, numAttack, probDefend)
+    casualtiesDefend = rbinom(1, numDefend, probAttack)
+    numAttack = numAttack - casualtiesAttack
+    numDefend = numDefend - casualtiesDefend
+  }
+  
+  lstResult = list()
+  lstResult$numAttack = max(numAttack, 0)
+  lstResult$numDefend = max(numDefend, 0)
+  lstResult$victor = ifelse(numAttack > numDefend, "Attacker", "Defender")
+  lstResult$attackerWins = ifelse(numAttack > numDefend, 1, 0)
+  lstResult
+}
+
+numAttack = 10
+numDefend = 10
+probAttack = 1/2
+probDefend = 1/3
+set.seed(1234)
+lstResult = Battle(numAttack, numDefend, probAttack, probDefend)
+print(paste("Victor is", lstResult$victor))
+```
+
+Cool. We can resolve any arbitrary battle. Given equal sizes of an attacking force of tanks and a defending force of infantry, what's the probability of a defender victory?
+
+```{r HistogramDefenderVictory, echo = TRUE}
+simulations = 500
+
+SimulateBattles = function(simulations, numAttack, numDefend, probAttack, probDefend){
+  lstResults = list()
+  for (i in 1:simulations){
+    lstResults[[i]] = Battle(numAttack, numDefend, probAttack, probDefend)
+  }
+
+  lstResults
+}
+
+lstResults = SimulateBattles(simulations, numAttack, numDefend, probAttack, probDefend)
+attackerVictory = sapply(lstResults, "[[", "attackerWins")
+probAttackWin = sum(attackerVictory) / simulations
+```
+
+Given equal sizes, we see (no surprise) that the attacker is more likely to win. But at what cost?
+
+```{r Cost, echo = TRUE}
+tankCost = 5
+infantryCost = 3
+survivingAttackers = sapply(lstResults, "[[", "numAttack")
+survivingDefenders = sapply(lstResults, "[[", "numDefend")
+totalAttackerCost = (tankCost * mean(survivingAttackers)) - tankCost * numAttack
+totalDefenderCost = (infantryCost * mean(survivingDefenders)) - infantryCost * numDefend
+```
+
+A tank attack is more likely to prevail, but the cost is higher. Again, no surprises. Finally, let's alter the premise and give each player equal resources. What kind of units should each player buy, presuming that one will attack and one defend? We'll consider four games:
+Game 1 - Both players use infantry
+Game 2 - Attacker uses infantry, defender uses tanks
+Game 3 - Attacker uses tanks, defender uses infantry
+Game 4 - Bot players use tanks
+
+```{r Game1, echo = TRUE}
+attackerResources = 30
+defenderResources = 30
+
+# Game 1 - All infantry
+numAttack = attackerResources / infantryCost
+numDefend = defenderResources / infantryCost
+lstResults = SimulateBattles(simulations, numAttack, numDefend, 1/6, 1/3)
+
+probAttackWin = sum(sapply(lstResults, "[[", "attackerWins")) / simulations
+
+totalAttackerCost = (infantryCost * mean(sapply(lstResults, "[[", "numAttack"))) - infantryCost * numAttack
+totalDefenderCost = (infantryCost * mean(sapply(lstResults, "[[", "numDefend"))) - infantryCost * numDefend
+```
+
+Game 1, with all infantry is a clear loser to the attacker, with a probability of victory only `r probAttackWin` . I'll simulate three other games, but not echo the code.
+
+```{r Game2, echo = FALSE}
+# Game 2 - Attack infantry, defend tanks
+numAttack = attackerResources / infantryCost
+numDefend = defenderResources / tankCost
+lstResults = SimulateBattles(simulations, numAttack, numDefend, 1/6, 1/3)
+
+probAttackWin = sum(sapply(lstResults, "[[", "attackerWins")) / simulations
+
+totalAttackerCost = (infantryCost * mean(sapply(lstResults, "[[", "numAttack"))) - infantryCost * numAttack
+totalDefenderCost = (infantryCost * mean(sapply(lstResults, "[[", "numDefend"))) - tankCost * numDefend
+```
+
+In Game 2, the attacker uses infantry and the defender uses tanks. This means that the attack and defense probabilities don't change, but the number of units involved- because of their cost- does. Little matter. The attacker has an increased likelihood of victory, `r probAttackWin`,  but it's still low.
+
+```{r Game3, echo = FALSE}
+# Game 3 - Attack tanks, defend infantry
+numAttack = attackerResources / tankCost
+numDefend = defenderResources / infantryCost
+lstResults = SimulateBattles(simulations, numAttack, numDefend, 1/2, 1/3)
+
+probAttackWin = sum(sapply(lstResults, "[[", "attackerWins")) / simulations
+
+totalAttackerCost = (infantryCost * mean(sapply(lstResults, "[[", "numAttack"))) - tankCost * numAttack
+totalDefenderCost = (infantryCost * mean(sapply(lstResults, "[[", "numDefend"))) - infantryCost * numDefend
+```
+
+In game 3, the attacker uses tanks and the defender uses infantry. In this case, the attacker has a greater than 50% chance of success. For this simulation, it's `r probAttackWin`.
+
+```{r Game4, echo = FALSE}
+# Game 4 - Attack tanks, defend infantry
+numAttack = attackerResources / tankCost
+numDefend = defenderResources / tankCost
+lstResults = SimulateBattles(simulations, numAttack, numDefend, 1/2, 1/3)
+
+probAttackWin = sum(sapply(lstResults, "[[", "attackerWins")) / simulations
+
+totalAttackerCost = (infantryCost * mean(sapply(lstResults, "[[", "numAttack"))) - tankCost * numAttack
+totalDefenderCost = (infantryCost * mean(sapply(lstResults, "[[", "numDefend"))) - tankCost * numDefend
+```
+
+In game 4, each player uses tanks. This is not a great strategy for the defender as there is now just around a 1 in 4 chance of victory.
+
+So, the strategy employed in game 3- attacker uses tanks and defender uses infantry- is the one which is optimal for each player. And that's typically how we played it. Of course, what makes the game fun is that there are those less likely situations when a defender would defeat the odds and prevail, or the attacker would win but at a ruinous cost. Over the course of many hours, there were plenty of new situations to consider and none of us relied on a computer to determine strategy. Good times.
+
+Tomorrow: Very probably more monte carlo simulation.
+
+```{r SessionInfo}
+sessionInfo()
+```

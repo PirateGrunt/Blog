@@ -1,0 +1,93 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=5, fig.height=5, cache=FALSE)
+````
+
+Today, I'm going to finally dip my toe in the water of something I've wanted to do for a long time. I'd wanted to do this with Michael Caine film appearances- and I may yet- but tonight, it'll be a bit simpler. I'm going to draw a network graph, showing the relationship between band members of the Grateful Dead and a couple of their solo and non-Dead projects. Information is from my head or wikipedia, reflecting the most recent band lineups. 
+
+First, I'll create data frames for several bands.
+
+```{r BuildBands, echo=TRUE}
+dfGratefulDead = data.frame(Musician = c("Jerry Garcia", "Bob Weir", "Phil Lesh"
+                                          , "Bill Kreutzmann", "Mickey Hart", "Pigpen")
+                            , Instrument = c("guitar", "guitar", "bass"
+                                           , "drums", "drums", "keyboards"))
+
+dfJerryGarciaBand = data.frame(Musician = c("Jerry Garcia", "John Kahn", "Melvin Seals"
+                                             , "David Kemper", "Jaclyn LaBranch", "Gloria Jones")
+                               , Instrument = c("guitar", "bass", "keyboards"
+                                              , "drums", "vocals", "vocals"))
+```
+
+```{r, echo=FALSE}
+dfRatDog = data.frame(Musician = c("Bob Weir", "Jay Lane", "Robin Sylvester"
+                                    , "Jeff Chimenti", "Kenny Brooks", "Mark Karan")
+                      , Instrument = c("guitar", "drums", "bass"
+                                       , "keyboards", "saxophone", "vocals"))
+
+dfOtherOnes = data.frame(Musician = c("Bob Weir", "Phil Lesh", "Mickey Hart"
+                                       , "Bill Kreutzmann", "Jimmy Herring", "Rob Barraco"
+                                       , "Jeff Chimenti", "Joan Osborne")
+                         , Instrument = c("guitar", "bass", "drums"
+                                          , "drums", "guitar", "keyboards"
+                                          , "keyboards", "vocals"))
+library(xtable)
+```
+**Grateful Dead**
+```{r, echo=FALSE, results = 'asis'}
+print(xtable(dfGratefulDead), type = "html")
+```
+**Jerry Garcia Band**
+```{r, echo = FALSE, results = 'asis'}
+print(xtable(dfJerryGarciaBand), type = "html")
+```
+
+I've created data frames for RatDog and the Other Ones as well, but the code and results are not shown. Next, I'll code a helper function to create relationships between band members.
+```{r ReadData, warning = FALSE, message = FALSE, fig.width = 10}
+CreateRelation = function(dfBand, BandName){
+
+  indices = combn(length(dfBand$Musician), 2)
+  
+  dfRelate = data.frame(from = dfBand$Musician[indices[1, ]]
+                        , to = dfBand$Musician[indices[2, ]])
+  dfRelate$Band = BandName
+  
+  dfRelate
+  
+}
+```
+
+With that in place, I can create relationships and then rbind the results. I tried adding a color column for a musicians instrument, but haven't had any luck in being able to apply it in the plot. Suggestions are welcome.
+
+```{r, echo=TRUE}
+dfGDrelate = CreateRelation(dfGratefulDead, "GratefulDead")
+dfJGBrelate = CreateRelation(dfJerryGarciaBand, "Jerry Garcia Band")
+dfRatDogRelate = CreateRelation(dfRatDog, "RatDog")
+dfOtherOnesRelate = CreateRelation(dfOtherOnes, "The Other Ones")
+
+dfMusicians = rbind(dfGratefulDead, dfJerryGarciaBand, dfRatDog, dfOtherOnes)
+
+dfMusicians = dfMusicians[!duplicated(dfMusicians), ]
+
+dfInstrumentColor = data.frame(Instrument = c("bass", "drums", "guitar", "keyboards", "vocals", "saxophone")
+                               , Color = c("black", "beige", "red", "blue", "green", "yellow"))
+dfMusicians = merge(dfMusicians, dfInstrumentColor)
+dfMusicians = dfMusicians[, c("Musician", "Instrument", "Color")]
+
+dfRelations = rbind(dfGDrelate, dfJGBrelate, dfRatDogRelate, dfOtherOnesRelate)
+```
+
+```{r fig.width=10, fig.height=10}
+library(igraph)
+
+g = graph.data.frame(dfRelations, directed=FALSE, vertices=dfMusicians)
+
+set.seed(1234)
+plot(g, vertex.color = g$Color)
+```
+
+Note the mashup of Bobby, Mickey, Bill and Phil in the center. They've had a lot of crossover post 1995. If I didn't have to work tomorrow, I'd probably spend the next few hours playing with this. Developing a chart of all the permutations of Yes, Asia, King Crimson, etc. could take the better part of an evening.
+
+```{r SessionInfo}
+sessionInfo()
+```

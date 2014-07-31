@@ -1,0 +1,68 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=5, fig.height=5, cache=FALSE)
+````
+
+How often is someone nominated for an academy award? Who has been nominated most often? Is there a difference between leading and supporting roles? Important questions. To answer them, I'm making use of a list of academy award nominees and winners. I've obtained the data from [aggdata.com](http://aggdata.com/awards/oscar) which has a few sets of free data. We'll open the file, do some basic clean up and then have a look at the results for Michael Caine. Note that these results are only through 2010.
+
+```{r ReadData, warning = FALSE}
+dfAwards = read.csv("./Data/academy_awards.csv", stringsAsFactors = FALSE)
+dfAwards = dfAwards[,1:5]
+dfAwards$Year = as.numeric(substr(dfAwards$Year,1,4))
+colnames(dfAwards) = gsub(".", "", colnames(dfAwards), fixed = TRUE)
+dfAwards$Won = dfAwards$Won == "YES"
+
+dfCaine = subset(dfAwards, Nominee == "Michael Caine")
+row.names(dfCaine) = NULL
+
+FirstNominated = min(dfCaine$Year)
+FirstWon = min(dfCaine$Year[dfCaine$Won == TRUE])
+```
+
+Michael Caine has been nominated `r nrow(dfCaine)` times and has won `r sum(dfCaine$Won)` times. It took `r FirstWon - FirstNominated` years for him to win his first award. That's a long time. My guess is that actors receive more multiple nominations and receive nominations over a longer period of time. I'll split the data into actor and actress categories to test this.
+
+```{r SplitData, warning = FALSE}
+dfAwards$Gender = "Other"
+dfAwards$Gender[grepl("Actor", dfAwards$Category)] = "Actor"
+dfAwards$Gender[grepl("Actress", dfAwards$Category)] = "Actress"
+dfActors = subset(dfAwards, Gender != "Other")
+row.names(dfActors) = NULL
+
+library(plyr)
+plyActor = ddply(dfActors, .(Nominee, Gender), summarize, FirstNominated = min(Year), NumberNominated = length(Year), LastNominated = max(Year))
+
+plyActor$Span = plyActor$LastNominated - plyActor$FirstNominated
+row.names(plyActor)= NULL
+meanActor = mean(plyActor$Span[plyActor$Gender == "Actor"])
+meanActress = mean(plyActor$Span[plyActor$Gender == "Actress"])
+```
+
+We see that the mean length of time between first and last nomination is fairly comparable. Mean have a slightly longer span, but only just. A box plot of the span looks like this:
+
+```{r Plots, fig.width = 10, fig.height = 7}
+library(ggplot2)
+ggplot(plyActor, aes(factor(Gender), Span)) + geom_boxplot()
+```
+
+We'll do the same for number of nominations. It's a similar window into the potential longevity of someone's career, or the degree to which someone commands attention.
+
+```{r NumberNominated, fig.width = 10, fig.height = 7}
+actorNominees = mean(plyActor$NumberNominated[plyActor$Gender == "Actor"])
+actressNominees = mean(plyActor$NumberNominated[plyActor$Gender == "Actress"])
+ggplot(plyActor, aes(factor(Gender), NumberNominated)) + geom_boxplot()
+```
+
+Curiously, just who are those individuals who have career spans greater than 40 years? And which people have been nominated more than 10 times""
+
+```{r SpanGt40}
+plyActor[plyActor$Span > 40, ]
+plyActor[plyActor$NumberNominated >= 10, ]
+```
+
+OK, I could see that. Katharine Hepburn, Paul Newman, Julie Christie, Bette Davis. A superficial look suggests that gender may not suffer from an age bias. Mind, I'd love to have more data to explore this further. In the meantime, I think I'm going to go watch "On Golden Pond". I saw it when it first came out and it was clearly one hell of a movie for older performers.
+
+Tomorrow: Unsure what will be covered. I'm going to a PostgreSQL meetup, so possibly that.
+
+```{r SessionInfo}
+sessionInfo()
+```

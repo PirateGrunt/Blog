@@ -1,0 +1,64 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=5, fig.height=5, cache=FALSE)
+````
+
+Yesterday I said that I'd carry on with the monte carlo simulation of insurance data. I'm not going to as I don't think I've got enough time and mental energy to do it justice. I'm sure tens of people are disappointed to learn this.
+
+Instead, I'm going to have a look at the recently released PISA study, which assesses student performance in many countries around the world. This is always a subject of great (if fleeting) interest here in the US as we tend to punch well below our weight. There are many, many issues around education reform in the US and I couldn't possibly treat them here. Suffice it to say that the PISA study prompts many questions about why one of the world's wealthiest nations (seemingly) can't educate its children as well as other countries with fewer resources. News outlets will have [their say](http://www.cnn.com/2013/12/03/world/asia/pisa-education-study/), pundits will [have theirs](http://www.washingtonpost.com/blogs/answer-sheet/wp/2013/11/14/the-fetishization-of-international-test-scores/) and wingnuts will also [air their views](http://punditfromanotherplanet.com/2013/12/04/world-student-rankings-china-is-cheating-the-pisa-system/).
+
+But this isn't a site devoted to conjecture. I'd rather devote my time to the objective assessment of data. Noting that this is a nearly impossible goal- my biases will invariably surface- let's talk about data.
+
+First, it's not easy to get and interpret. Some digging on the [PISA site](http://www.oecd.org/pisa/home/) leads us to the spot where we can get data. All that may be found [here](http://pisa2012.acer.edu.au/) (Thanks Australia!) After a few minutes sifting through various options, I opted to look at the schools questionnairre file. This is a fixed width file, so I get to have my first experience in using something other than read.csv. After a cursory look at the [codebook](http://pisa2012.acer.edu.au/downloads/M_sch_codebook.pdf), I'm going to focus on just a few columns of information. I'm not clever enought to wrap my head around how to use the `fwf` function to pull just the columns I want, so I'm going to write a helper function.
+
+```{r ReadFile, echo=TRUE}
+filename = "./Data/INT_SCQ12_DEC03/INT_SCQ12_DEC03.txt"
+filewidth = 1271
+
+ReadColumn = function(filename, start, width, filewidth){
+  if (start == 1 ){
+    df = read.fwf(filename, c(width, width - filewidth))
+  } else {
+    df = read.fwf(filename, c(-(start-1), width, start + width - filewidth + 1))
+  }
+  df
+}
+
+```
+```{r dontrun, eval = FALSE, echo = FALSE}
+# country = ReadColumn(filename, 1, 3, filewidth)
+# public = ReadColumn(filename, 34, 3, filewidth)
+# location = ReadColumn(filename, 69, 3, filewidth)
+# classSize = ReadColumn(filename, 75, 2, filewidth)
+# yearbook = ReadColumn(filename, 311, 3, filewidth)
+# sportsTeam = ReadColumn(filename, 332, 3, filewidth)
+# bullied = ReadColumn(filename, 395, 3, filewidth)
+# standardCurriculum = ReadColumn(filename, 914, 3, filewidth)
+# 
+# df = cbind(country, public, location, classSize, yearbook, sportsTeam, bullied, standardCurriculum)
+# colnames(df) = c("Country", "Public", "Location", "ClassSize", "Yearbook", "SportsTeam", "Bullied", "StandardCurriculum")
+```
+
+And I quickly find that these column specifications are wrong. At this late hour, I can't spend any more time trying to decode every column, but I can identify whether or not a school is in an OECD country and whether or not it's private.
+
+```{r TwoCols, warning=FALSE, message = FALSE}
+public = ReadColumn(filename, 32, 1, filewidth)
+OECD = ReadColumn(filename, 18, 1, filewidth)
+
+df = cbind(public, OECD)
+colnames(df) = c("Public", "OECD")
+library(reshape2)
+df$variable = 1
+
+pivot = dcast(df, "Public ~ OECD", sum)
+pivot = pivot[pivot$Public <= 2, ]
+
+public.oecd = pivot[1,2] / sum(pivot[,2])
+public.other = pivot[1,3] / sum(pivot[,3])
+```
+
+The fraction of schools that are private in OECD countries is `r public.oecd` as compared to `r public.other` in other countries. That was a long walk to learn very little. There's undoubtedly loads of great information in here. It's a shame that the file specification isn't more clear. No wonder the pundits spend little time looking at the data.
+
+```{r SessionInfo}
+sessionInfo()
+```

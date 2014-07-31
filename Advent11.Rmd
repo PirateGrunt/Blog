@@ -1,0 +1,56 @@
+```{r setup, echo=FALSE}
+opts_knit$set(upload.fun = WrapWordpressUpload, base.url = NULL) 
+opts_chunk$set(fig.width=5, fig.height=5, cache=FALSE)
+````
+
+I don't know how often Michael Caine appeared in a Shakespearean work, but I'm sure that he has and I'm sure that he was excellent. A bit pressed for time today, so just a simple word cloud featuring the full text of King Lear. I found the text at a website that I presume is associated with a university in Cambridge. [http://shakespeare.mit.edu/lear/full.html](http://shakespeare.mit.edu/lear/full.html) I stored a local copy.
+
+My sister lives in Stratfrod-Upon-Avon and can't stop talking about Shakespeare. Today's post is dedicated to her.
+
+```{r ReadData, warning = FALSE, message = FALSE, fig.width = 10}
+aFile = readLines("./Data/Lear.txt")
+
+library(tm)
+myCorpus = Corpus(VectorSource(aFile))
+
+myCorpus = tm_map(myCorpus, tolower)
+myCorpus = tm_map(myCorpus, removePunctuation)
+myCorpus = tm_map(myCorpus, removeNumbers)
+myCorpus = tm_map(myCorpus, removeWords, stopwords('english'))
+
+myDTM = TermDocumentMatrix(myCorpus, control = list(minWordLength=1))
+
+m = as.matrix(myDTM)
+
+v = sort(rowSums(m), decreasing=TRUE)
+
+library(wordcloud)
+set.seed(1234)
+wordcloud (names(v), v, min.freq=15)  
+```
+
+A lot of "king", "lear", "thee", "thy" and "thou".
+
+And of course in searching for a reference, for the code above (I modified from it something else), I came across this: [Text mining Shakespeare](http://www.r-bloggers.com/text-mining-the-complete-works-of-william-shakespeare/). I feel even lazier than I did before.
+
+I can't leave it at that, so I'll very quickly determine the most frequent 2 and 3 word phrases in the text.
+
+```{r trigram, warning = FALSE, message = FALSE}
+library(tau)
+
+bigrams = textcnt(aFile, n = 2, method = "string")
+bigrams = bigrams[order(bigrams, decreasing = TRUE)]
+bigrams[1]
+bigrams[2]
+
+trigrams = textcnt(aFile, n = 3, method = "string")
+trigrams = trigrams[order(trigrams, decreasing = TRUE)]
+trigrams[1]
+trigrams[2]
+```
+
+No surprises that the most frequent bigram is "king lear" at 209 times and "my lord" is the sort of thing one would expect in an Elizabethan play. I like that the most frequent trigram is "king lear no" at 13. I'll have to have a look at the text to see what's behind that.
+
+```{r SessionInfo}
+sessionInfo()
+```
